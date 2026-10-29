@@ -9,7 +9,7 @@ import {
   varchar,
 } from "@termix-ssh/plugin-sdk/db";
 
-// Stored as p_ai_chat_chats. One chat session per row; the agent conversation
+// Stored as p_agent_chat_chats. One chat session per row; the agent conversation
 // lives in messages.
 export const chats = defineTable(
   "chats",
@@ -23,7 +23,7 @@ export const chats = defineTable(
     updatedAt: timestamp().notNull().defaultNow(),
   },
   {
-    indexes: [{ name: "idx_p_ai_chat_chats_user_id", columns: ["userId"] }],
+    indexes: [{ name: "idx_p_agent_chat_chats_user_id", columns: ["userId"] }],
   },
 );
 
@@ -47,7 +47,10 @@ export const messages = defineTable(
   },
   {
     indexes: [
-      { name: "idx_p_ai_chat_messages_chat_seq", columns: ["chatId", "seq"] },
+      {
+        name: "idx_p_agent_chat_messages_chat_seq",
+        columns: ["chatId", "seq"],
+      },
     ],
   },
 );

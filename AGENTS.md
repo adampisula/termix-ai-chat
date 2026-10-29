@@ -58,7 +58,11 @@ file per theme scoped under `.<id>`). A theme only plugin has no `src/`: just `m
 ## About this plugin
 
 - What it does: an LLM chat whose agent can run shell commands on the user's SSH hosts. One tool,
-  `run_command`, via `ctx.ssh.exec`, with the acting user's connect access checked per call.
+  `run_command`, via `createSshExecFn`: `ctx.ssh.exec` when the server provides it, else
+  `ctx.ssh.connect` plus a raw ssh2 exec channel (26.10 servers have no `ctx.ssh.exec`). Connect access
+  is checked per call either way.
+- Id: `agent-chat`, NOT `ai-chat` — id `ai-chat` puts tables under `p_ai_chat_`, nested inside the
+  official AI Assistant plugin's (id `ai`) `p_ai_` namespace, and the two cannot be installed together.
 - Layout: `src/backend/providers/` holds thin streaming adapters over `ctx.fetch` (no provider SDKs);
   `src/backend/agent/` holds the run loop, the approval registry, the allowlist matcher and the
   command executor; `src/backend/routes.ts` wires chats, runs, SSE streaming, approvals, models and hosts.
@@ -78,3 +82,6 @@ file per theme scoped under `.<id>`). A theme only plugin has no `src/`: just `m
 - Releases: pushing to main runs `release-on-push.yml`, which releases the manifest version unless its
   tag exists. A push without a version bump does nothing; the shared `release.yml` (dev branches, beta,
   overwrite) stays for the registry flow.
+- Placement: the frontend registers a rail tab or a sidebar panel from the user's `uiPlacement`
+  setting, read off `/status` at activate and re-registered through `app.onSettingsChanged`. Both the
+  tab and the panel ids are declared in `contributes`.

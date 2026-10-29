@@ -1,5 +1,5 @@
 {
-  "id": "ai-chat",
+  "id": "agent-chat",
   "name": "AI Chat",
   "version": "1.0.0",
   "description": "An LLM chat that can run commands on your SSH hosts and read their output.",
@@ -7,8 +7,8 @@
     "name": "AI Chat contributors"
   },
   "license": "Apache-2.0",
-  "repository": "https://github.com/your-org/termix-plugin-ai-chat",
-  "docs": "https://github.com/your-org/termix-plugin-ai-chat/tree/main/docs",
+  "repository": "https://github.com/your-org/termix-plugin-agent-chat",
+  "docs": "https://github.com/your-org/termix-plugin-agent-chat/tree/main/docs",
   "category": "Productivity",
   "icon": "Bot",
   "features": [
@@ -36,10 +36,17 @@
   "contributes": {
     "tabs": [
       {
-        "id": "ai-chat",
+        "id": "agent-chat",
         "titleKey": "tab.title",
         "icon": "Bot",
         "openFrom": ["rail"]
+      }
+    ],
+    "panels": [
+      {
+        "id": "agent-chat",
+        "titleKey": "tab.title",
+        "icon": "Bot"
       }
     ],
     "permissions": [
@@ -84,6 +91,18 @@
         }
       ],
       "user": [
+        {
+          "key": "uiPlacement",
+          "type": "select",
+          "labelKey": "settings.user.uiPlacement.label",
+          "descriptionKey": "settings.user.uiPlacement.description",
+          "default": "tab",
+          "options": [
+            { "value": "tab", "labelKey": "settings.user.uiPlacement.tab" },
+            { "value": "panel", "labelKey": "settings.user.uiPlacement.panel" }
+          ],
+          "group": "Appearance"
+        },
         {
           "key": "provider",
           "type": "select",

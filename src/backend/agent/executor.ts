@@ -42,7 +42,7 @@ export async function executeCommand(
     const access = await ctx.hosts.checkAccess(hostId, "connect");
     if (!access.hasAccess) {
       await ctx.audit.record({
-        action: "plugin.ai-chat.command.denied",
+        action: "plugin.agent-chat.command.denied",
         resourceType: "host",
         resourceId: String(hostId),
         details: truncateForLog(command),
@@ -75,7 +75,7 @@ export async function executeCommand(
       maxOutputBytes: Math.max(limits.maxOutputChars * 4, 65536),
     });
     await ctx.audit.record({
-      action: "plugin.ai-chat.command.run",
+      action: "plugin.agent-chat.command.run",
       resourceType: "host",
       resourceId: String(hostId),
       details: truncateForLog(command),
@@ -93,7 +93,7 @@ export async function executeCommand(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await ctx.audit.record({
-      action: "plugin.ai-chat.command.run",
+      action: "plugin.agent-chat.command.run",
       resourceType: "host",
       resourceId: String(hostId),
       details: truncateForLog(command),

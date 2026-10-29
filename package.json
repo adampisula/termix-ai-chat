@@ -1,5 +1,5 @@
 {
-  "name": "termix-plugin-ai-chat",
+  "name": "termix-plugin-agent-chat",
   "private": true,
   "version": "1.0.0",
   "type": "module",

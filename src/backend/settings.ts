@@ -101,3 +101,13 @@ export function asEffort(value: unknown): ReasoningEffort | undefined {
     ? (value as ReasoningEffort)
     : undefined;
 }
+
+export type UiPlacement = "tab" | "panel";
+
+export async function loadPlacement(
+  ctx: PluginContext,
+  userId: string,
+): Promise<UiPlacement> {
+  const value = await ctx.settings.getUser(userId, "uiPlacement");
+  return value === "panel" ? "panel" : "tab";
+}

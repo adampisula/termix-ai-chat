@@ -11,7 +11,7 @@ export async function activate(ctx: PluginContext) {
     messagesTable,
   });
   ctx.disposables.add(dispose);
-  ctx.log.info("ai-chat ready");
+  ctx.log.info("agent-chat ready");
 }
 
 export async function deactivate() {

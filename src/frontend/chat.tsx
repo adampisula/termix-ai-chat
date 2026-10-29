@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useSettings,
   useTranslation,
-  type TabProps,
   type TermixApp,
 } from "@termix-ssh/plugin-sdk/frontend";
 import {
   Badge,
   Button,
+  Input,
   PanelShell,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Select,
   SelectContent,
   SelectItem,
@@ -177,8 +180,14 @@ async function* parseSse(
   }
 }
 
+/** Props both a tab and a sidebar panel provide (all optional). */
+interface SurfaceProps {
+  isVisible?: boolean;
+  active?: boolean;
+}
+
 export function createChatTab(app: TermixApp) {
-  return function AiChatTab(_props: TabProps) {
+  return function AiChatTab(_props: SurfaceProps) {
     const { t } = useTranslation();
     const confirm = useConfirm();
     const settings = useSettings("user");
@@ -203,6 +212,8 @@ export function createChatTab(app: TermixApp) {
     const [models, setModels] = useState<ModelOption[]>([]);
     const [modelsError, setModelsError] = useState(false);
     const [model, setModel] = useState("");
+    const [modelQuery, setModelQuery] = useState("");
+    const [modelOpen, setModelOpen] = useState(false);
     const [effort, setEffort] = useState<Effort>("none");
     const [approvalMode, setApprovalMode] = useState<ApprovalMode>("ask");
     const streamRef = useRef<AbortController | null>(null);
@@ -279,7 +290,16 @@ export function createChatTab(app: TermixApp) {
             "/models",
           );
           if (!cancelled) {
-            setModels(data.models);
+            // Alphabetical by display name, deduplicated by id.
+            const seen = new Set<string>();
+            const sorted = [...data.models]
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .filter((option) => {
+                if (seen.has(option.id)) return false;
+                seen.add(option.id);
+                return true;
+              });
+            setModels(sorted);
             setModelsError(false);
           }
         } catch {
@@ -291,6 +311,15 @@ export function createChatTab(app: TermixApp) {
         cancelled = true;
       };
     }, [app]);
+
+    const filteredModels = useMemo(() => {
+      const query = modelQuery.trim().toLowerCase();
+      if (!query) return models;
+      return models.filter((option) =>
+        `${option.name} ${option.id}`.toLowerCase().includes(query),
+      );
+    }, [models, modelQuery]);
+    const selectedModel = models.find((option) => option.id === model);
 
     const openStream = useCallback(
       async (id: string) => {
@@ -497,30 +526,74 @@ export function createChatTab(app: TermixApp) {
         scroll={false}
         toolbar={
           <div className="flex items-center gap-2">
-            <Select value={model} onValueChange={setModel}>
-              <SelectTrigger className="h-7 w-64 text-xs" size="sm">
-                <SelectValue placeholder={t("tab.model.label")} />
-              </SelectTrigger>
-              <SelectContent>
-                {models.length === 0 ? (
-                  <div className="px-2 py-1 text-xs text-muted-foreground">
-                    {modelsError
-                      ? t("tab.model.error")
-                      : t("tab.model.loading")}
-                  </div>
-                ) : (
-                  models.map((option) => (
-                    <SelectItem
-                      key={option.id}
-                      value={option.id}
-                      className="text-xs"
-                    >
-                      {option.name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+            <Popover open={modelOpen} onOpenChange={setModelOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="flex h-7 w-64 items-center justify-between gap-2 rounded-md border border-border bg-transparent px-2 text-xs hover:bg-muted/50"
+                  title={t("tab.model.label")}
+                >
+                  <span className="truncate">
+                    {selectedModel
+                      ? selectedModel.name
+                      : model || t("tab.model.label")}
+                  </span>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="size-3 shrink-0 opacity-50"
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-1" align="start">
+                <Input
+                  value={modelQuery}
+                  onChange={(event) => setModelQuery(event.target.value)}
+                  placeholder={t("tab.model.search")}
+                  className="mb-1 h-7 text-xs"
+                  autoFocus
+                />
+                <div className="max-h-64 overflow-y-auto">
+                  {models.length === 0 ? (
+                    <p className="px-2 py-1 text-xs text-muted-foreground">
+                      {modelsError
+                        ? t("tab.model.error")
+                        : t("tab.model.loading")}
+                    </p>
+                  ) : filteredModels.length === 0 ? (
+                    <p className="px-2 py-1 text-xs text-muted-foreground">
+                      {t("tab.model.none")}
+                    </p>
+                  ) : (
+                    filteredModels.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className={`flex w-full flex-col items-start rounded px-2 py-1 text-left text-xs hover:bg-muted ${
+                          option.id === model ? "bg-muted" : ""
+                        }`}
+                        onClick={() => {
+                          setModel(option.id);
+                          setModelOpen(false);
+                          setModelQuery("");
+                        }}
+                      >
+                        <span className="w-full truncate">{option.name}</span>
+                        <span className="w-full truncate text-muted-foreground">
+                          {option.id}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
             <Select
               value={effort}
               onValueChange={(value) => setEffort(value as Effort)}

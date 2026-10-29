@@ -39,7 +39,7 @@ beforeEach(async () => {
     capabilities: manifest.capabilities,
     db: db.database,
     router: () => (router = express.Router()),
-    permissions: ["ai-chat.use"],
+    permissions: ["agent-chat.use"],
   });
   await activate(mock.ctx);
 
@@ -297,14 +297,16 @@ describe("chat routes", () => {
     expect(hosts.body.hosts).toEqual([]);
 
     const status = await request("GET", "/status");
-    expect(status.body).toMatchObject({ configured: false });
+    expect(status.body).toMatchObject({ configured: false, placement: "tab" });
 
     await configureProvider();
+    await mock.ctx.settings.setUser("user-1", "uiPlacement", "panel");
     const configured = await request("GET", "/status");
     expect(configured.body).toMatchObject({
       configured: true,
       provider: "openrouter",
       model: "test/model",
+      placement: "panel",
     });
   });
 

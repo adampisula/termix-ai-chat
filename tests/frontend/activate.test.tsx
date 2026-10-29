@@ -21,11 +21,11 @@ afterEach(async () => {
 describe(`${manifest.id} activate`, () => {
   it("registers the rail item and tab", async () => {
     rendered = await renderWithApp(plugin, { manifest, locales });
-    expect(rendered.registered.tabs()).toEqual(["ai-chat"]);
+    expect(rendered.registered.tabs()).toEqual(["agent-chat"]);
     expect(rendered.registered.railItems()).toEqual([
       expect.objectContaining({
-        id: "ai-chat",
-        permission: "ai-chat.use",
+        id: "agent-chat",
+        permission: "agent-chat.use",
       }),
     ]);
   });
@@ -41,7 +41,7 @@ describe(`${manifest.id} activate`, () => {
         }),
       } as never,
     });
-    rendered.renderTab("ai-chat", { isVisible: true });
+    rendered.renderTab("agent-chat", { isVisible: true });
     expect(await screen.findByText(locales.tab.newChat)).toBeTruthy();
     expect(screen.getByText(locales.tab.empty)).toBeTruthy();
     expect(screen.getByText(locales.tab.noChats)).toBeTruthy();
@@ -100,7 +100,7 @@ describe(`${manifest.id} activate`, () => {
         }),
       } as never,
     });
-    rendered.renderTab("ai-chat", { isVisible: true });
+    rendered.renderTab("agent-chat", { isVisible: true });
     expect(await screen.findByText("Disk check")).toBeTruthy();
     // Click the chat to load it.
     (screen.getByText("Disk check") as HTMLElement).click();

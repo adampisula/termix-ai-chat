@@ -40,7 +40,8 @@
       "effort": "Effort",
       "loading": "Loading models…",
       "none": "No models found",
-      "error": "Could not load models. Check your API key."
+      "error": "Could not load models. Check your API key.",
+      "search": "Type to filter models…"
     },
     "effort": {
       "none": "No reasoning",
@@ -81,6 +82,12 @@
       }
     },
     "user": {
+      "uiPlacement": {
+        "label": "Where the chat lives",
+        "description": "Show AI Chat as a tab opened from the sidebar rail, or as a panel in the sidebar. Takes effect right away.",
+        "tab": "Tab (default)",
+        "panel": "Sidebar panel"
+      },
       "provider": {
         "label": "Provider",
         "description": "Which LLM provider to use. The matching API key below is required.",

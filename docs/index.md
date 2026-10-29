@@ -1,6 +1,6 @@
 # AI Chat
 
-AI Chat adds an LLM chat to Termix that can run shell commands on your SSH hosts and read their output. It works like a coding agent for your servers: you describe what you want, the agent proposes commands, runs them through Termix's own SSH pipeline and reports what happened.
+AI Chat adds an LLM chat to Termix that can run shell commands on your SSH hosts and read their output. It works like a coding agent for your servers: you describe what you want, the agent proposes commands, runs them through Termix's own SSH pipeline and reports what happened. Its plugin id is `agent-chat`, chosen so it installs alongside the AI Assistant plugin.
 
 ## Install
 
@@ -28,7 +28,11 @@ If you do not answer an approval within 15 minutes the command is denied and the
 
 ## Models and reasoning
 
-The chat toolbar has a model picker (loaded from your provider) and a reasoning-effort picker: none, low, medium or high. Effort maps to `reasoning_effort` on OpenAI, the `reasoning` object on OpenRouter and extended thinking on Anthropic. Settings, AI Chat holds the defaults new chats start with. Each provider also takes an optional base URL override, so proxies and compatible endpoints work.
+The chat toolbar has a model picker (loaded from your provider) and a reasoning-effort picker: none, low, medium or high. The model list is sorted alphabetically and has a search box, so you can type to filter it. Effort maps to `reasoning_effort` on OpenAI, the `reasoning` object on OpenRouter and extended thinking on Anthropic. Settings, AI Chat holds the defaults new chats start with. Each provider also takes an optional base URL override, so proxies and compatible endpoints work.
+
+## Where the chat lives
+
+Settings, AI Chat has a "Where the chat lives" option: a tab opened from the sidebar rail (default) or a panel that lives in the sidebar. Changing it takes effect right away.
 
 ## Limits
 

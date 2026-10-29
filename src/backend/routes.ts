@@ -14,11 +14,13 @@ import {
   type RunHandle,
 } from "./agent/runs.js";
 import { hostLabel } from "./agent/prompt.js";
+import { createSshExecFn } from "./agent/ssh-exec.js";
 import {
   asApprovalMode,
   asEffort,
   loadAllowlist,
   loadLimits,
+  loadPlacement,
   loadProviderConfig,
 } from "./settings.js";
 
@@ -99,7 +101,7 @@ export function registerRoutes(
 
   /**
    * @openapi
-   * /plugin-api/ai-chat/chats:
+   * /plugin-api/agent-chat/chats:
    *   get:
    *     summary: List the signed-in user's chats
    *     tags:
@@ -120,7 +122,7 @@ export function registerRoutes(
 
   /**
    * @openapi
-   * /plugin-api/ai-chat/chats:
+   * /plugin-api/agent-chat/chats:
    *   post:
    *     summary: Create a chat
    *     tags:
@@ -177,7 +179,7 @@ export function registerRoutes(
 
   /**
    * @openapi
-   * /plugin-api/ai-chat/chats/{id}:
+   * /plugin-api/agent-chat/chats/{id}:
    *   patch:
    *     summary: Rename a chat or change its approval mode
    *     tags:
@@ -228,7 +230,7 @@ export function registerRoutes(
 
   /**
    * @openapi
-   * /plugin-api/ai-chat/chats/{id}:
+   * /plugin-api/agent-chat/chats/{id}:
    *   delete:
    *     summary: Delete a chat and its messages
    *     tags:
@@ -258,7 +260,7 @@ export function registerRoutes(
 
   /**
    * @openapi
-   * /plugin-api/ai-chat/chats/{id}/messages:
+   * /plugin-api/agent-chat/chats/{id}/messages:
    *   get:
    *     summary: List a chat's messages in order
    *     tags:
@@ -306,7 +308,7 @@ export function registerRoutes(
 
   /**
    * @openapi
-   * /plugin-api/ai-chat/chats/{id}/messages:
+   * /plugin-api/agent-chat/chats/{id}/messages:
    *   post:
    *     summary: Send a user message and start an agent run
    *     tags:
@@ -456,8 +458,7 @@ export function registerRoutes(
       allowlist,
       approvalTimeoutMs: APPROVAL_TIMEOUT_MS,
       approvals,
-      sshExec: (hostId, command, execOptions) =>
-        ctx.ssh.exec(hostId, command, execOptions),
+      sshExec: createSshExecFn(ctx),
       store,
       isCancelled: () => controller.signal.aborted,
       signal: controller.signal,
@@ -475,7 +476,7 @@ export function registerRoutes(
 
   /**
    * @openapi
-   * /plugin-api/ai-chat/runs/{id}/stream:
+   * /plugin-api/agent-chat/runs/{id}/stream:
    *   get:
    *     summary: Stream a run's events as server-sent events
    *     tags:
@@ -523,7 +524,7 @@ export function registerRoutes(
 
   /**
    * @openapi
-   * /plugin-api/ai-chat/runs/{id}/approvals/{toolCallId}:
+   * /plugin-api/agent-chat/runs/{id}/approvals/{toolCallId}:
    *   post:
    *     summary: Approve or deny a pending command
    *     tags:
@@ -575,7 +576,7 @@ export function registerRoutes(
 
   /**
    * @openapi
-   * /plugin-api/ai-chat/runs/{id}/cancel:
+   * /plugin-api/agent-chat/runs/{id}/cancel:
    *   post:
    *     summary: Cancel a run
    *     tags:
@@ -603,7 +604,7 @@ export function registerRoutes(
 
   /**
    * @openapi
-   * /plugin-api/ai-chat/models:
+   * /plugin-api/agent-chat/models:
    *   get:
    *     summary: List models for the user's configured provider
    *     tags:
@@ -644,7 +645,7 @@ export function registerRoutes(
 
   /**
    * @openapi
-   * /plugin-api/ai-chat/hosts:
+   * /plugin-api/agent-chat/hosts:
    *   get:
    *     summary: List hosts the user can connect to
    *     tags:
@@ -669,7 +670,7 @@ export function registerRoutes(
 
   /**
    * @openapi
-   * /plugin-api/ai-chat/status:
+   * /plugin-api/agent-chat/status:
    *   get:
    *     summary: Whether the user's provider is configured
    *     tags:
@@ -680,11 +681,13 @@ export function registerRoutes(
    */
   router.get("/status", async (_req: Request, res: Response) => {
     const config = await loadProviderConfig(ctx, actor());
+    const placement = await loadPlacement(ctx, actor());
     res.json({
       configured: config !== null,
       provider: config?.provider ?? null,
       model: config?.model ?? null,
       effort: config?.effort ?? null,
+      placement,
       knownProviders: Object.keys(PROVIDERS) as ProviderId[],
     });
   });

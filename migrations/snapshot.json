@@ -37,7 +37,7 @@
       },
       "indexes": [
         {
-          "name": "idx_p_ai_chat_chats_user_id",
+          "name": "idx_p_agent_chat_chats_user_id",
           "columns": [
             "userId"
           ]
@@ -81,7 +81,7 @@
       },
       "indexes": [
         {
-          "name": "idx_p_ai_chat_messages_chat_seq",
+          "name": "idx_p_agent_chat_messages_chat_seq",
           "columns": [
             "chatId",
             "seq"
