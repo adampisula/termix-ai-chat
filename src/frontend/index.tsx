@@ -43,9 +43,23 @@ export async function activate(app: TermixApp): Promise<void> {
     disposer?.();
     disposer = null;
     if (placement === "panel") {
-      disposer = app.registerPanel(TAB_ID, createChatTab(app), {
+      // The shell renders a sidebar panel from the tab registered under the
+      // same id (the pattern Plugin-Alerts uses), so both go up and the rail
+      // item stays out of the way.
+      const undoPanel = app.registerPanel(TAB_ID, createChatTab(app), {
         keepMounted: true,
       });
+      const undoTab = app.registerTab(TAB_ID, createChatTab(app), {
+        icon: BotIcon,
+        titleKey: "tab.title",
+        singleton: true,
+        hostless: true,
+        panelFrame: true,
+      });
+      disposer = () => {
+        undoPanel();
+        undoTab();
+      };
       return;
     }
     const undoRail = app.registerRailItem({

@@ -15,6 +15,7 @@ import {
 } from "./agent/runs.js";
 import { hostLabel } from "./agent/prompt.js";
 import { createSshExecFn } from "./agent/ssh-exec.js";
+import { SshPromptRegistry } from "./agent/ssh-prompts.js";
 import {
   asApprovalMode,
   asEffort,
@@ -60,6 +61,7 @@ export function registerRoutes(
   const actor = () => ctx.currentActor() as string;
 
   const approvals = new ApprovalRegistry();
+  const prompts = new SshPromptRegistry(APPROVAL_TIMEOUT_MS);
   const runs = new Map<string, RunHandle>();
   const cancelHooks = new Map<string, AbortController>();
   const chatBusy = new Set<number>();
@@ -75,6 +77,7 @@ export function registerRoutes(
   const dispose = () => {
     for (const controller of cancelHooks.values()) controller.abort();
     approvals.cancelAll();
+    prompts.cancelAll();
     cancelHooks.clear();
   };
 
@@ -458,7 +461,8 @@ export function registerRoutes(
       allowlist,
       approvalTimeoutMs: APPROVAL_TIMEOUT_MS,
       approvals,
-      sshExec: createSshExecFn(ctx),
+      makeSshExec: (emit) =>
+        createSshExecFn(ctx, { userId: actor(), runId, prompts, emit }),
       store,
       isCancelled: () => controller.signal.aborted,
       signal: controller.signal,
@@ -576,6 +580,57 @@ export function registerRoutes(
 
   /**
    * @openapi
+   * /plugin-api/agent-chat/runs/{id}/prompts/{promptId}:
+   *   post:
+   *     summary: Answer a pending SSH prompt, like a key passphrase
+   *     tags:
+   *       - AI Chat
+   *     parameters:
+   *       - name: id
+   *         in: path
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - name: promptId
+   *         in: path
+   *         required: true
+   *         schema:
+   *           type: string
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               answer:
+   *                 type: string
+   *                 nullable: true
+   *                 description: The answer, or null to give up
+   *     responses:
+   *       200:
+   *         description: The answer was applied
+   *       404:
+   *         description: No such run or pending prompt
+   */
+  router.post(
+    "/runs/:id/prompts/:promptId",
+    async (req: Request, res: Response) => {
+      const run = getRunForActor(String(req.params.id));
+      if (!run) return res.status(404).json({ error: "No such run" });
+      const answer =
+        typeof req.body?.answer === "string" ? req.body.answer : null;
+      const promptId = String(req.params.promptId);
+      const ok = prompts.resolve(String(req.params.id), promptId, answer);
+      if (!ok) return res.status(404).json({ error: "No such pending prompt" });
+      // Every subscriber drops the question card now that it is answered.
+      run.emit({ type: "ssh_prompt_resolved", promptId });
+      res.json({ success: true });
+    },
+  );
+
+  /**
+   * @openapi
    * /plugin-api/agent-chat/runs/{id}/cancel:
    *   post:
    *     summary: Cancel a run
@@ -599,6 +654,7 @@ export function registerRoutes(
     if (!run) return res.status(404).json({ error: "No such run" });
     cancelHooks.get(runId)?.abort();
     approvals.cancelRun(runId);
+    prompts.cancelRun(runId);
     res.json({ success: true });
   });
 

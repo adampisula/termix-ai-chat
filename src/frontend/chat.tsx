@@ -204,6 +204,12 @@ export function createChatTab(app: TermixApp) {
       toolCards: [],
       error: null,
     });
+    const [sshPrompt, setSshPrompt] = useState<{
+      promptId: string;
+      prompt: string;
+      echo: boolean;
+    } | null>(null);
+    const [promptAnswer, setPromptAnswer] = useState("");
     const [approval, setApproval] = useState<{
       toolCallId: string;
       hostId: number;
@@ -257,6 +263,7 @@ export function createChatTab(app: TermixApp) {
         setActiveId(chatId);
         setLive({ text: "", toolCards: [], error: null });
         setApproval(null);
+        setSshPrompt(null);
         setRunId(null);
         setRunStatus(null);
         setError(null);
@@ -369,6 +376,18 @@ export function createChatTab(app: TermixApp) {
                     : card,
                 ),
               }));
+            } else if (type === "ssh_prompt") {
+              setSshPrompt({
+                promptId: String(event.promptId),
+                prompt: String(event.prompt),
+                echo: event.echo === true,
+              });
+              setPromptAnswer("");
+            } else if (type === "ssh_prompt_resolved") {
+              const promptId = String(event.promptId);
+              setSshPrompt((prev) =>
+                prev?.promptId === promptId ? null : prev,
+              );
             } else if (type === "tool_result") {
               const toolCallId = String(event.toolCallId);
               setLive((prev) => ({
@@ -413,6 +432,7 @@ export function createChatTab(app: TermixApp) {
           setRunId(null);
           setRunStatus(null);
           setApproval(null);
+          setSshPrompt(null);
           if (finished && activeIdRef.current != null) {
             try {
               const { data } = await app.api.get<{ messages: StoredMessage[] }>(
@@ -467,6 +487,21 @@ export function createChatTab(app: TermixApp) {
         });
       } catch {
         // The approval may have timed out; the run continues either way.
+      }
+    };
+
+    const answerPrompt = async (giveUp: boolean) => {
+      if (!runId || !sshPrompt) return;
+      try {
+        await app.api.post(`/runs/${runId}/prompts/${sshPrompt.promptId}`, {
+          answer: giveUp ? null : promptAnswer,
+        });
+        setSshPrompt((prev) =>
+          prev?.promptId === sshPrompt.promptId ? null : prev,
+        );
+        setPromptAnswer(``);
+      } catch {
+        // The prompt may have timed out; the run continues either way.
       }
     };
 
@@ -691,6 +726,53 @@ export function createChatTab(app: TermixApp) {
                   {live.toolCards.map((card) => (
                     <ToolCard key={card.id} card={card} t={t} />
                   ))}
+                  {sshPrompt && (
+                    <div className="rounded-md border border-border bg-card p-3 text-sm">
+                      <p className="mb-2 font-medium">
+                        {t("tab.prompt.title")}
+                      </p>
+                      <p className="mb-1 break-all text-xs text-muted-foreground">
+                        {sshPrompt.prompt}
+                      </p>
+                      <Input
+                        type={sshPrompt.echo ? "text" : "password"}
+                        value={promptAnswer}
+                        placeholder={t("tab.prompt.placeholder")}
+                        className="mb-1 h-8 text-xs"
+                        onChange={(event) =>
+                          setPromptAnswer(event.target.value)
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            void answerPrompt(false);
+                          }
+                        }}
+                        autoFocus
+                      />
+                      {!sshPrompt.echo && (
+                        <p className="mb-2 text-xs text-muted-foreground">
+                          {t("tab.prompt.secret")}
+                        </p>
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          disabled={!promptAnswer.trim()}
+                          onClick={() => void answerPrompt(false)}
+                        >
+                          {t("tab.prompt.submit")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void answerPrompt(true)}
+                        >
+                          {t("tab.prompt.cancel")}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                   {approval && (
                     <div className="rounded-md border border-border bg-card p-3 text-sm">
                       <p className="mb-2 font-medium">

@@ -8,10 +8,12 @@ You describe what you want; the agent proposes shell commands, runs them on the 
 
 - Chat with an LLM that runs commands on your hosts via `ctx.ssh` (jump hosts, proxies, every auth type just work)
 - Three approval modes per chat: **ask first**, **auto-run safe** (prefix allowlist, shell metacharacters always refused) and **auto-run all**
-- Model and reasoning-effort picker per chat; OpenRouter, OpenAI and Anthropic adapters with optional base URL overrides
+- Asks you for a key passphrase, password or TOTP code in the chat when a host needs it, and keeps the connection open so you type it once per session
+- Model and reasoning-effort picker per chat; the model list is searchable; OpenRouter, OpenAI and Anthropic adapters with optional base URL overrides
 - Chat history persisted per user on the server
 - Per-user, encrypted API keys; every executed command is audited
 - Admin limits: command timeout, output size per command, steps per message
+- Setting to show the chat as a rail tab or a sidebar panel entry
 
 ## Requirements
 

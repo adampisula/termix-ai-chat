@@ -6,6 +6,7 @@ import {
   execOverClient,
   type ExecClient,
 } from "../../src/backend/agent/ssh-exec.js";
+import { SshPromptRegistry } from "../../src/backend/agent/ssh-prompts.js";
 
 const LIMITS = { timeoutMs: 5000, maxOutputBytes: 1024 };
 
@@ -119,7 +120,53 @@ describe("execOverClient", () => {
 });
 
 describe("createSshExecFn", () => {
-  it("uses ctx.ssh.exec when the runtime provides it", async () => {
+  const registry = new SshPromptRegistry(60000);
+
+  function makeCtx(overrides: Record<string, unknown>) {
+    return { ssh: overrides } as unknown as PluginContext;
+  }
+
+  it("uses ctx.ssh.withConnection with the plugin pool when present", async () => {
+    const stream = makeStream();
+    const client = makeClient(stream);
+    let fn: ((c: unknown) => Promise<unknown>) | null = null;
+    let poolOptions: Record<string, unknown> | null = null;
+    const withConnection = vi.fn(
+      (
+        host: number,
+        options: Record<string, unknown> & { pool: string },
+        run: (c: unknown) => Promise<unknown>,
+      ) => {
+        poolOptions = options;
+        fn = run;
+        return run(client);
+      },
+    );
+    const ctx = makeCtx({ withConnection });
+    const run = createSshExecFn(ctx, {
+      userId: "u1",
+      runId: "r1",
+      prompts: registry,
+      emit: () => {},
+    });
+    const pending = run(3, "uname -a", LIMITS);
+    await vi.waitFor(() => expect(client.commands).toHaveLength(1));
+    stream.emit("data", "Linux");
+    stream.emit("exit", 0);
+    stream.emit("close");
+    const result = (await pending) as { stdout: string; code: number | null };
+    expect(withConnection).toHaveBeenCalledWith(
+      3,
+      expect.anything(),
+      expect.any(Function),
+    );
+    expect((poolOptions as { pool: string }).pool).toBe("agent-chat-ssh");
+    expect((poolOptions as { prompt: unknown }).prompt).toBeTruthy();
+    expect(result.stdout).toBe("Linux");
+    expect(result.code).toBe(0);
+  });
+
+  it("passes a prompt channel to ctx.ssh.exec when only exec exists", async () => {
     const exec = vi.fn(async () => ({
       stdout: "ok",
       stderr: "",
@@ -127,20 +174,33 @@ describe("createSshExecFn", () => {
       truncated: false,
       timedOut: false,
     }));
-    const ctx = { ssh: { exec } } as unknown as PluginContext;
-    const fn = createSshExecFn(ctx);
-    const result = await fn(1, "ls", LIMITS);
-    expect(exec).toHaveBeenCalledWith(1, "ls", LIMITS);
-    expect(result.stdout).toBe("ok");
+    const ctx = makeCtx({ exec });
+    const fn = createSshExecFn(ctx, {
+      userId: "u1",
+      runId: "r1",
+      prompts: registry,
+      emit: () => {},
+    });
+    await fn(1, "ls", LIMITS);
+    expect(exec).toHaveBeenCalledWith(
+      1,
+      "ls",
+      expect.objectContaining({ prompt: expect.anything() }),
+    );
   });
 
-  it("falls back to connect and a raw channel when exec is missing", async () => {
+  it("falls back to connect and a raw channel when neither exists", async () => {
     const stream = makeStream();
     const client = makeClient(stream);
     const dispose = vi.fn();
     const connect = vi.fn(async () => ({ client, dispose }));
-    const ctx = { ssh: { connect } } as unknown as PluginContext;
-    const fn = createSshExecFn(ctx);
+    const ctx = makeCtx({ connect });
+    const fn = createSshExecFn(ctx, {
+      userId: "u1",
+      runId: "r1",
+      prompts: registry,
+      emit: () => {},
+    });
     const pending = fn(7, "uname -a", LIMITS);
     // connect resolves asynchronously; wait until the channel is opened.
     await vi.waitFor(() => expect(client.commands).toHaveLength(1));
@@ -150,7 +210,10 @@ describe("createSshExecFn", () => {
     const result = await pending;
     expect(connect).toHaveBeenCalledWith(
       7,
-      expect.objectContaining({ purpose: "agent-chat" }),
+      expect.objectContaining({
+        purpose: "agent-chat",
+        prompt: expect.anything(),
+      }),
     );
     expect(result.stdout).toBe("Linux");
     expect(result.code).toBe(0);
@@ -162,10 +225,117 @@ describe("createSshExecFn", () => {
     const client = makeClient(null, new Error("boom"));
     const dispose = vi.fn();
     const connect = vi.fn(async () => ({ client, dispose }));
-    const ctx = { ssh: { connect } } as unknown as PluginContext;
-    const fn = createSshExecFn(ctx);
+    const ctx = makeCtx({ connect });
+    const fn = createSshExecFn(ctx, {
+      userId: "u1",
+      runId: "r1",
+      prompts: registry,
+      emit: () => {},
+    });
     const result = await fn(3, "ls", LIMITS);
     expect(result.stderr).toContain("boom");
     expect(dispose).toHaveBeenCalled();
+  });
+});
+
+describe("SshPromptRegistry", () => {
+  const base = {
+    userId: "u1",
+    runId: "r1",
+    hostId: 5,
+    request: {
+      kind: "input" as const,
+      prompt: "Enter passphrase for key:",
+      echo: false,
+    },
+  };
+
+  it("asks, is answered and remembers the answer", async () => {
+    const registry = new SshPromptRegistry(60000);
+    const events: Record<string, unknown>[] = [];
+    const pending = registry.ask({ ...base, emit: (e) => events.push(e) });
+    registry.resolve("u1", String(events[0].promptId), "secret");
+    await expect(pending).resolves.toBe("secret");
+    // A second ask for the same prompt is answered from the cache.
+    const again = registry.ask({
+      ...base,
+      runId: "r2",
+      emit: () => {},
+    });
+    await expect(again).resolves.toBe("secret");
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: "ssh_prompt",
+      kind: "input",
+      echo: false,
+    });
+  });
+
+  it("never caches TOTP codes", async () => {
+    const registry = new SshPromptRegistry(60000);
+    const events: Record<string, unknown>[] = [];
+    const first = registry.ask({
+      ...base,
+      request: { kind: "totp", prompt: "Verification code:", retry: false },
+      emit: (e) => events.push(e),
+    });
+    registry.resolve("u1", String(events[0].promptId), "123456");
+    await expect(first).resolves.toBe("123456");
+    let asked = 0;
+    registry.ask({
+      ...base,
+      request: { kind: "totp", prompt: "Verification code:", retry: false },
+      emit: () => asked++,
+    });
+    expect(asked).toBe(1);
+  });
+
+  it("gives up on timeout", async () => {
+    vi.useFakeTimers();
+    const registry = new SshPromptRegistry(1000);
+    const events: Record<string, unknown>[] = [];
+    const pending = registry.ask({ ...base, emit: (e) => events.push(e) });
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(pending).resolves.toBeNull();
+    expect(events.at(-1)).toMatchObject({
+      type: "ssh_prompt_resolved",
+      timeout: true,
+    });
+    vi.useRealTimers();
+  });
+
+  it("cancels a run's prompts and never another run's", async () => {
+    const registry = new SshPromptRegistry(60000);
+    const eventsA: Record<string, unknown>[] = [];
+    const eventsB: Record<string, unknown>[] = [];
+    const a = registry.ask({ ...base, emit: (e) => eventsA.push(e) });
+    const b = registry.ask({
+      ...base,
+      runId: "r2",
+      emit: (e) => eventsB.push(e),
+    });
+    registry.cancelRun("r1");
+    await expect(a).resolves.toBeNull();
+    expect(registry.resolve("u1", String(eventsB[0].promptId), "later")).toBe(
+      true,
+    );
+    await expect(b).resolves.toBe("later");
+  });
+
+  it("gives up immediately for browser sign-in rounds", async () => {
+    const registry = new SshPromptRegistry(60000);
+    const result = await registry.ask({
+      ...base,
+      request: {
+        kind: "browser",
+        prompt: "",
+        label: "SSO",
+        url: "https://sso.test",
+        code: "N/A",
+        instructions: "Open the link",
+      },
+      emit: () => {},
+    });
+    expect(result).toBeNull();
   });
 });

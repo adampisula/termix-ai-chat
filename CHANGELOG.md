@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.0
+
+### Added
+
+- The agent can ask for a key passphrase, a password or a TOTP code in the chat: the question appears as a card while the command waits, and typed passphrases and passwords are remembered for the session
+- Commands run over a pooled connection per user and host, so an unlocked host stays reachable without re-prompting
+
+### Fixed
+
+- The sidebar panel mode now actually lists the chat as an entry in the sidebar (the shell builds the panel from the tab registered under the same id, as the Alerts plugin does)
+
 ## 1.1.0
 
 ### Added
@@ -23,5 +34,3 @@
 - Per-user encrypted API keys and optional base URL overrides
 - Admin limits for command timeout, output size and steps per message
 - Audit lines for every command execution
-
-

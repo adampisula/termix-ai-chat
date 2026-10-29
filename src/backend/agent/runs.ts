@@ -22,6 +22,8 @@ export interface RunEvent {
     | "tool_result"
     | "approval_request"
     | "approval_resolved"
+    | "ssh_prompt"
+    | "ssh_prompt_resolved"
     | "error"
     | "done";
   [key: string]: unknown;
@@ -87,7 +89,7 @@ export interface RunDeps {
   allowlist: { prefixes: string[] };
   approvalTimeoutMs: number;
   approvals: ApprovalRegistry;
-  sshExec: SshExecFn;
+  makeSshExec: (emit: (event: RunEvent) => void) => SshExecFn;
   store: MessageStore;
   isCancelled: () => boolean;
   /** Aborted with the run; forwarded to the provider call. */
@@ -101,6 +103,8 @@ export interface RunHandle {
   status: RunStatus;
   lastError: string | null;
   subscribe: (listener: (event: RunEvent) => void) => () => void;
+  /** Feeds an event to every current subscriber (used for prompt answers). */
+  emit: (event: RunEvent) => void;
   promise: Promise<void>;
 }
 
@@ -134,6 +138,7 @@ export async function runAgentTurn(
 
   let status: RunStatus = "running";
   let lastError: string | null = null;
+  const sshExec = deps.makeSshExec(emit);
   const setStatus = (next: RunStatus) => {
     status = next;
     emit({ type: "status", status: next });
@@ -154,6 +159,7 @@ export async function runAgentTurn(
       listener({ type: "status", status });
       return () => listeners.delete(listener);
     },
+    emit,
     promise: undefined as unknown as Promise<void>,
   };
 
@@ -223,7 +229,16 @@ export async function runAgentTurn(
             emit({ type: "done" });
             return;
           }
-          await runToolCall(runId, chat, call, ctx, deps, emit, setStatus);
+          await runToolCall(
+            runId,
+            chat,
+            call,
+            ctx,
+            deps,
+            emit,
+            setStatus,
+            sshExec,
+          );
         }
       }
     } catch (error) {
@@ -289,6 +304,7 @@ async function runToolCall(
   deps: RunDeps,
   emit: (event: RunEvent) => void,
   setStatus: (status: RunStatus) => void,
+  sshExec: SshExecFn,
 ): Promise<void> {
   emit({
     type: "tool_call",
@@ -351,7 +367,7 @@ async function runToolCall(
       call.hostId,
       call.command,
       deps.limits,
-      deps.sshExec,
+      sshExec,
     );
     await deps.store.append(chat.id, chat.userId, "tool", {
       toolCallId: call.id,

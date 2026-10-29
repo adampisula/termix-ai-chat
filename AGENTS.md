@@ -58,9 +58,9 @@ file per theme scoped under `.<id>`). A theme only plugin has no `src/`: just `m
 ## About this plugin
 
 - What it does: an LLM chat whose agent can run shell commands on the user's SSH hosts. One tool,
-  `run_command`, via `createSshExecFn`: `ctx.ssh.exec` when the server provides it, else
-  `ctx.ssh.connect` plus a raw ssh2 exec channel (26.10 servers have no `ctx.ssh.exec`). Connect access
-  is checked per call either way.
+  `run_command`, via `createSshExecFn`: `ctx.ssh.withConnection` over a plugin pool when the server
+  provides it (26.10 does), falling back to `ctx.ssh.exec`, then to `ctx.ssh.connect` plus a raw ssh2
+  exec channel. Connect access is checked per call either way.
 - Id: `agent-chat`, NOT `ai-chat` — id `ai-chat` puts tables under `p_ai_chat_`, nested inside the
   official AI Assistant plugin's (id `ai`) `p_ai_` namespace, and the two cannot be installed together.
 - Layout: `src/backend/providers/` holds thin streaming adapters over `ctx.fetch` (no provider SDKs);
@@ -82,6 +82,12 @@ file per theme scoped under `.<id>`). A theme only plugin has no `src/`: just `m
 - Releases: pushing to main runs `release-on-push.yml`, which releases the manifest version unless its
   tag exists. A push without a version bump does nothing; the shared `release.yml` (dev branches, beta,
   overwrite) stays for the registry flow.
-- Placement: the frontend registers a rail tab or a sidebar panel from the user's `uiPlacement`
-  setting, read off `/status` at activate and re-registered through `app.onSettingsChanged`. Both the
-  tab and the panel ids are declared in `contributes`.
+- Placement: the frontend registers a rail tab, or in panel mode a sidebar panel plus its tab (the
+  shell renders the panel from the tab registered under the same id — the Plugin-Alerts pattern; a
+  `contributes.panels` entry alone renders nothing). Read off `/status` at activate, re-registered
+  through `app.onSettingsChanged`.
+- SSH prompts: `createSshExecFn` attaches a prompt channel and runs commands through
+  `ctx.ssh.withConnection` over pool `agent-chat-ssh`, so an encrypted key's passphrase is asked once
+  through the run's SSE stream (`ssh_prompt` events, answered on `/runs/:id/prompts/:promptId`) and the
+  connection stays open. Passphrase answers are cached in memory per user, host and prompt text; TOTP
+  codes never are.

@@ -35,6 +35,13 @@
       "deny": "Deny",
       "alwaysSafe": "Always allow commands like this"
     },
+    "prompt": {
+      "title": "The host is asking for input",
+      "submit": "Send",
+      "cancel": "Skip",
+      "placeholder": "Your answer…",
+      "secret": "Your answer is sent once and remembered for this session."
+    },
     "model": {
       "label": "Model",
       "effort": "Effort",
@@ -84,7 +91,7 @@
     "user": {
       "uiPlacement": {
         "label": "Where the chat lives",
-        "description": "Show AI Chat as a tab opened from the sidebar rail, or as a panel in the sidebar. Takes effect right away.",
+        "description": "Tab: opened from the sidebar rail. Panel: an entry in the sidebar, and the rail icon goes away. Takes effect right away.",
         "tab": "Tab (default)",
         "panel": "Sidebar panel"
       },

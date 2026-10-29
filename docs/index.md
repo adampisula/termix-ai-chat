@@ -24,7 +24,9 @@ Each chat has an approval mode, changeable from the chat toolbar:
 - **Auto-run safe**. Commands that start with a prefix from your safe list run without asking; everything else waits. You can edit the list in Settings, AI Chat. Commands containing `;`, `&&`, `|`, redirections or command substitution are never auto-approved, whatever the list says. The list is a convenience, not a safety boundary.
 - **Auto-run all**. Every command runs immediately. Use this only on hosts where you are comfortable with that.
 
-If you do not answer an approval within 15 minutes the command is denied and the agent moves on.
+If a host needs input to connect — an encrypted SSH key's passphrase, a password or a TOTP code — the chat shows a card asking for it while the command waits. Typed passphrases and passwords are remembered for the session (in memory on the server, per user and host), and the connection to the host stays open, so you type it once, not per command.
+
+If you do not answer an approval or a connection question within 15 minutes the command is denied and the agent moves on.
 
 ## Models and reasoning
 

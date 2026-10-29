@@ -1,7 +1,7 @@
 {
   "id": "agent-chat",
   "name": "AI Chat",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "An LLM chat that can run commands on your SSH hosts and read their output.",
   "author": {
     "name": "AI Chat contributors"
@@ -39,16 +39,7 @@
         "id": "agent-chat",
         "titleKey": "tab.title",
         "icon": "Bot",
-        "openFrom": [
-          "rail"
-        ]
-      }
-    ],
-    "panels": [
-      {
-        "id": "agent-chat",
-        "titleKey": "tab.title",
-        "icon": "Bot"
+        "openFrom": ["rail"]
       }
     ],
     "permissions": [
@@ -56,10 +47,7 @@
         "name": "use",
         "titleKey": "permissions.use.title",
         "descriptionKey": "permissions.use.description",
-        "defaultRoles": [
-          "admin",
-          "user"
-        ]
+        "defaultRoles": ["admin", "user"]
       }
     ],
     "settings": {
@@ -249,9 +237,5 @@
     }
   },
   "locales": "locales",
-  "platforms": [
-    "linux",
-    "win32",
-    "darwin"
-  ]
+  "platforms": ["linux", "win32", "darwin"]
 }
