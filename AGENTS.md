@@ -91,3 +91,6 @@ file per theme scoped under `.<id>`). A theme only plugin has no `src/`: just `m
   through the run's SSE stream (`ssh_prompt` events, answered on `/runs/:id/prompts/:promptId`) and the
   connection stays open. Passphrase answers are cached in memory per user, host and prompt text; TOTP
   codes never are.
+- Encrypted keys: Termix throws "SSH key is encrypted" BEFORE any keyboard-interactive round, so the
+  prompt channel alone never sees it. `withRetry` in `ssh-exec.ts` catches that error, asks for the
+  passphrase as an `ssh_prompt` card and retries once with `overrides: { keyPassword, forceKeyboardInteractive }`.

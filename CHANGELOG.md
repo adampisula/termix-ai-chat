@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1
+
+### Fixed
+
+- An encrypted SSH key no longer dead-ends the agent: Termix refuses the connection before any prompt round, so the chat now asks for the passphrase as a card and retries the connection with it. The passphrase is remembered for the session like before.
+
 ## 1.2.0
 
 ### Added

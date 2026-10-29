@@ -189,6 +189,85 @@ describe("createSshExecFn", () => {
     );
   });
 
+  it("asks for the passphrase and retries when the key is encrypted", async () => {
+    const registry = new SshPromptRegistry(60000);
+    const events: Record<string, unknown>[] = [];
+    const options: Array<Record<string, unknown>> = [];
+    let fail = true;
+    const withConnection = vi.fn(
+      (
+        _host: number,
+        opts: Record<string, unknown>,
+        run: (c: unknown) => Promise<unknown>,
+      ) => {
+        options.push(opts);
+        if (fail) {
+          return Promise.reject(
+            new Error(
+              "SSH key is encrypted. Please enter the passphrase to unlock it.",
+            ),
+          );
+        }
+        const stream = makeStream();
+        setTimeout(() => {
+          stream.emit("data", "unlocked");
+          stream.emit("exit", 0);
+          stream.emit("close");
+        }, 0);
+        return run({
+          exec: (
+            _command: string,
+            cb: (err: Error | undefined, opened?: FakeStream) => void,
+          ) => cb(undefined, stream),
+        });
+      },
+    );
+    const ctx = makeCtx({ withConnection });
+    const fn = createSshExecFn(ctx, {
+      userId: "u1",
+      runId: "r1",
+      prompts: registry,
+      emit: (e) => events.push(e),
+    });
+
+    const pending = fn(9, "echo ok", LIMITS);
+    // The encrypted-key failure asks the user through the stream.
+    await vi.waitFor(() =>
+      expect(events.some((e) => e.type === "ssh_prompt")).toBe(true),
+    );
+    const promptEvent = events.find((e) => e.type === "ssh_prompt")!;
+    expect(String(promptEvent.prompt)).toContain("passphrase");
+    fail = false;
+    registry.resolve("u1", String(promptEvent.promptId), "hunter2");
+    const result = (await pending) as { stdout: string; code: number | null };
+    expect(result.stdout).toBe("unlocked");
+    expect(result.code).toBe(0);
+    // The retry forced the passphrase into the connection.
+    expect(options[1].overrides).toEqual({
+      keyPassword: "hunter2",
+      forceKeyboardInteractive: true,
+    });
+    // The answer is cached: a second command connects without asking again.
+    const second = (await fn(9, "echo again", LIMITS)) as { stdout: string };
+    expect(second.stdout).toBe("unlocked");
+    expect(events.filter((e) => e.type === "ssh_prompt")).toHaveLength(1);
+  });
+
+  it("does not retry other connection errors", async () => {
+    const withConnection = vi.fn(() =>
+      Promise.reject(new Error("connection refused")),
+    );
+    const ctx = makeCtx({ withConnection });
+    const fn = createSshExecFn(ctx, {
+      userId: "u1",
+      runId: "r1",
+      prompts: registry,
+      emit: () => {},
+    });
+    await expect(fn(9, "ls", LIMITS)).rejects.toThrow("connection refused");
+    expect(withConnection).toHaveBeenCalledTimes(1);
+  });
+
   it("falls back to connect and a raw channel when neither exists", async () => {
     const stream = makeStream();
     const client = makeClient(stream);

@@ -73,30 +73,84 @@ export function createSshExecFn(
     ) => Promise<{ client: unknown; dispose: () => void }>;
   };
 
+  /**
+   * Core refuses an encrypted key outright when no passphrase is known
+   * ("SSH key is encrypted. Please enter the passphrase to unlock it."),
+   * before any keyboard-interactive round the prompt channel could answer.
+   * When that happens, ask the user for the passphrase through the chat and
+   * retry once with it forced into the connection, then cache it for the
+   * session.
+   */
+  const isEncryptedKeyError = (error: unknown): boolean => {
+    const message = error instanceof Error ? error.message : String(error);
+    return /ssh key is encrypted|passphrase to unlock|encrypted private key/i.test(
+      message,
+    );
+  };
+
+  const withRetry = (
+    attempt: (
+      hostId: number,
+      command: string,
+      options: { timeoutMs: number; maxOutputBytes: number },
+      overrides?: Record<string, unknown>,
+    ) => Promise<RawExecResult>,
+  ): SshExecFn => {
+    return async (hostId, command, options) => {
+      try {
+        return await attempt(hostId, command, options);
+      } catch (error) {
+        if (!isEncryptedKeyError(error)) throw error;
+        const answer = await opts.prompts.ask({
+          userId: opts.userId,
+          runId: opts.runId,
+          hostId,
+          request: {
+            kind: "input",
+            prompt:
+              "The SSH key for this host is encrypted. Type its passphrase to unlock it:",
+            echo: false,
+          },
+          emit: opts.emit,
+        });
+        if (answer === null) throw error;
+        return await attempt(hostId, command, options, {
+          keyPassword: answer,
+          forceKeyboardInteractive: true,
+        });
+      }
+    };
+  };
+
   if (typeof ssh.withConnection === "function") {
-    return (hostId, command, options) =>
-      ssh.withConnection!(
-        hostId,
-        {
-          pool: "agent-chat-ssh",
-          purpose: "agent-chat",
-          profile: "background",
-          prompt: withHost(hostId),
-        },
-        (client) => execOverClient(client as ExecClient, command, options),
-      ) as Promise<RawExecResult>;
+    return withRetry(
+      (hostId, command, options, overrides) =>
+        ssh.withConnection!(
+          hostId,
+          {
+            pool: "agent-chat-ssh",
+            purpose: "agent-chat",
+            profile: "background",
+            prompt: withHost(hostId),
+            ...(overrides ? { overrides } : {}),
+          },
+          (client) => execOverClient(client as ExecClient, command, options),
+        ) as Promise<RawExecResult>,
+    );
   }
   if (typeof ssh.exec === "function") {
-    return (hostId, command, options) =>
+    return withRetry((hostId, command, options, overrides) =>
       ssh.exec!(hostId, command, {
         purpose: "agent-chat",
         profile: "background",
         prompt: withHost(hostId),
         timeoutMs: options.timeoutMs,
         maxOutputBytes: options.maxOutputBytes,
-      });
+        ...(overrides ? { overrides } : {}),
+      }),
+    );
   }
-  return async (hostId, command, options) => {
+  return withRetry(async (hostId, command, options, overrides) => {
     if (typeof ssh.connect !== "function") {
       return {
         stdout: "",
@@ -110,13 +164,14 @@ export function createSshExecFn(
       purpose: "agent-chat",
       profile: "background",
       prompt: withHost(hostId),
+      ...(overrides ? { overrides } : {}),
     });
     try {
       return await execOverClient(client as ExecClient, command, options);
     } finally {
       dispose();
     }
-  };
+  });
 }
 
 export interface ExecClient {

@@ -206,6 +206,7 @@ export function createChatTab(app: TermixApp) {
     });
     const [sshPrompt, setSshPrompt] = useState<{
       promptId: string;
+      hostId: number;
       prompt: string;
       echo: boolean;
     } | null>(null);
@@ -379,6 +380,7 @@ export function createChatTab(app: TermixApp) {
             } else if (type === "ssh_prompt") {
               setSshPrompt({
                 promptId: String(event.promptId),
+                hostId: Number(event.hostId),
                 prompt: String(event.prompt),
                 echo: event.echo === true,
               });
@@ -730,6 +732,9 @@ export function createChatTab(app: TermixApp) {
                     <div className="rounded-md border border-border bg-card p-3 text-sm">
                       <p className="mb-2 font-medium">
                         {t("tab.prompt.title")}
+                      </p>
+                      <p className="mb-1 text-xs text-muted-foreground">
+                        {t("tab.tool.host")}: {sshPrompt.hostId}
                       </p>
                       <p className="mb-1 break-all text-xs text-muted-foreground">
                         {sshPrompt.prompt}
