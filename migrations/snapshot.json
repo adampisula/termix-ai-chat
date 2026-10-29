@@ -1,7 +1,7 @@
 {
   "version": 1,
   "tables": {
-    "notes": {
+    "chats": {
       "columns": {
         "id": {
           "type": "id",
@@ -13,8 +13,64 @@
           "length": 255,
           "notNull": true
         },
-        "text": {
-          "type": "text",
+        "title": {
+          "type": "varchar",
+          "length": 255,
+          "notNull": true
+        },
+        "approvalMode": {
+          "type": "varchar",
+          "length": 20,
+          "notNull": true,
+          "defaultValue": "ask"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "notNull": true,
+          "defaultNow": true
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "notNull": true,
+          "defaultNow": true
+        }
+      },
+      "indexes": [
+        {
+          "name": "idx_p_ai_chat_chats_user_id",
+          "columns": [
+            "userId"
+          ]
+        }
+      ]
+    },
+    "messages": {
+      "columns": {
+        "id": {
+          "type": "id",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chatId": {
+          "type": "integer",
+          "notNull": true
+        },
+        "userId": {
+          "type": "refUser",
+          "length": 255,
+          "notNull": true
+        },
+        "seq": {
+          "type": "integer",
+          "notNull": true
+        },
+        "role": {
+          "type": "varchar",
+          "length": 20,
+          "notNull": true
+        },
+        "parts": {
+          "type": "json",
           "notNull": true
         },
         "createdAt": {
@@ -25,8 +81,11 @@
       },
       "indexes": [
         {
-          "name": "idx_p_hello_world_notes_user_id",
-          "columns": ["userId"]
+          "name": "idx_p_ai_chat_messages_chat_seq",
+          "columns": [
+            "chatId",
+            "seq"
+          ]
         }
       ]
     }

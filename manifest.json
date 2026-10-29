@@ -1,33 +1,44 @@
 {
-  "id": "hello-world",
-  "name": "Hello World",
+  "id": "ai-chat",
+  "name": "AI Chat",
   "version": "1.0.0",
-  "description": "A minimal Termix plugin: one tab, one route, one setting and one table.",
+  "description": "An LLM chat that can run commands on your SSH hosts and read their output.",
   "author": {
-    "name": "Your Name"
+    "name": "AI Chat contributors"
   },
   "license": "Apache-2.0",
-  "repository": "https://github.com/your-org/termix-plugin-hello-world",
-  "docs": "https://github.com/your-org/termix-plugin-hello-world/tree/main/docs",
+  "repository": "https://github.com/your-org/termix-plugin-ai-chat",
+  "docs": "https://github.com/your-org/termix-plugin-ai-chat/tree/main/docs",
   "category": "Productivity",
-  "icon": "Hand",
+  "icon": "Bot",
   "features": [
-    "A tab opened from the sidebar",
-    "An admin setting",
-    "A table of greetings"
+    "Chat with an LLM that can run commands on your hosts",
+    "Per-chat approval modes: ask, auto-approve safe commands, or full auto",
+    "OpenRouter, OpenAI and Anthropic providers",
+    "Model and reasoning-effort picker per chat",
+    "Chat history saved per user",
+    "Every command execution is audited"
   ],
   "env": [],
   "engine": {
     "termix": ">=26.10.0",
     "api": "^1.2"
   },
-  "capabilities": ["db:own", "network:serve", "ui:surface"],
+  "capabilities": [
+    "db:own",
+    "ui:surface",
+    "network:serve",
+    "network:outbound",
+    "hosts:read",
+    "ssh:connect",
+    "credentials:use"
+  ],
   "contributes": {
     "tabs": [
       {
-        "id": "hello-world",
+        "id": "ai-chat",
         "titleKey": "tab.title",
-        "icon": "Hand",
+        "icon": "Bot",
         "openFrom": ["rail"]
       }
     ],
@@ -42,11 +53,167 @@
     "settings": {
       "admin": [
         {
-          "key": "greeting",
+          "key": "commandTimeoutSec",
+          "type": "number",
+          "labelKey": "settings.admin.commandTimeoutSec.label",
+          "descriptionKey": "settings.admin.commandTimeoutSec.description",
+          "default": 30,
+          "min": 1,
+          "max": 600,
+          "group": "Limits"
+        },
+        {
+          "key": "maxOutputChars",
+          "type": "number",
+          "labelKey": "settings.admin.maxOutputChars.label",
+          "descriptionKey": "settings.admin.maxOutputChars.description",
+          "default": 20000,
+          "min": 1000,
+          "max": 1000000,
+          "group": "Limits"
+        },
+        {
+          "key": "maxTurnsPerRun",
+          "type": "number",
+          "labelKey": "settings.admin.maxTurnsPerRun.label",
+          "descriptionKey": "settings.admin.maxTurnsPerRun.description",
+          "default": 25,
+          "min": 1,
+          "max": 100,
+          "group": "Limits"
+        }
+      ],
+      "user": [
+        {
+          "key": "provider",
+          "type": "select",
+          "labelKey": "settings.user.provider.label",
+          "descriptionKey": "settings.user.provider.description",
+          "default": "openrouter",
+          "options": [
+            {
+              "value": "openrouter",
+              "labelKey": "settings.user.provider.openrouter"
+            },
+            {
+              "value": "openai",
+              "labelKey": "settings.user.provider.openai"
+            },
+            {
+              "value": "anthropic",
+              "labelKey": "settings.user.provider.anthropic"
+            }
+          ],
+          "group": "Provider"
+        },
+        {
+          "key": "apiKeyOpenrouter",
+          "type": "secret",
+          "labelKey": "settings.user.apiKeyOpenrouter.label",
+          "descriptionKey": "settings.user.apiKeyOpenrouter.description",
+          "group": "Provider"
+        },
+        {
+          "key": "apiKeyOpenai",
+          "type": "secret",
+          "labelKey": "settings.user.apiKeyOpenai.label",
+          "descriptionKey": "settings.user.apiKeyOpenai.description",
+          "group": "Provider"
+        },
+        {
+          "key": "apiKeyAnthropic",
+          "type": "secret",
+          "labelKey": "settings.user.apiKeyAnthropic.label",
+          "descriptionKey": "settings.user.apiKeyAnthropic.description",
+          "group": "Provider"
+        },
+        {
+          "key": "baseUrlOpenrouter",
           "type": "string",
-          "labelKey": "settings.admin.greeting.label",
-          "descriptionKey": "settings.admin.greeting.description",
-          "default": "Hello"
+          "labelKey": "settings.user.baseUrlOpenrouter.label",
+          "descriptionKey": "settings.user.baseUrlOpenrouter.description",
+          "group": "Provider",
+          "placeholderKey": "settings.user.baseUrlOpenrouter.placeholder"
+        },
+        {
+          "key": "baseUrlOpenai",
+          "type": "string",
+          "labelKey": "settings.user.baseUrlOpenai.label",
+          "descriptionKey": "settings.user.baseUrlOpenai.description",
+          "group": "Provider",
+          "placeholderKey": "settings.user.baseUrlOpenai.placeholder"
+        },
+        {
+          "key": "baseUrlAnthropic",
+          "type": "string",
+          "labelKey": "settings.user.baseUrlAnthropic.label",
+          "descriptionKey": "settings.user.baseUrlAnthropic.description",
+          "group": "Provider",
+          "placeholderKey": "settings.user.baseUrlAnthropic.placeholder"
+        },
+        {
+          "key": "model",
+          "type": "string",
+          "labelKey": "settings.user.model.label",
+          "descriptionKey": "settings.user.model.description",
+          "group": "Chat defaults",
+          "placeholderKey": "settings.user.model.placeholder"
+        },
+        {
+          "key": "reasoningEffort",
+          "type": "select",
+          "labelKey": "settings.user.reasoningEffort.label",
+          "descriptionKey": "settings.user.reasoningEffort.description",
+          "default": "none",
+          "options": [
+            {
+              "value": "none",
+              "labelKey": "settings.user.reasoningEffort.none"
+            },
+            {
+              "value": "low",
+              "labelKey": "settings.user.reasoningEffort.low"
+            },
+            {
+              "value": "medium",
+              "labelKey": "settings.user.reasoningEffort.medium"
+            },
+            {
+              "value": "high",
+              "labelKey": "settings.user.reasoningEffort.high"
+            }
+          ],
+          "group": "Chat defaults"
+        },
+        {
+          "key": "defaultApprovalMode",
+          "type": "select",
+          "labelKey": "settings.user.defaultApprovalMode.label",
+          "descriptionKey": "settings.user.defaultApprovalMode.description",
+          "default": "ask",
+          "options": [
+            {
+              "value": "ask",
+              "labelKey": "settings.user.defaultApprovalMode.ask"
+            },
+            {
+              "value": "auto-safe",
+              "labelKey": "settings.user.defaultApprovalMode.autoSafe"
+            },
+            {
+              "value": "auto",
+              "labelKey": "settings.user.defaultApprovalMode.auto"
+            }
+          ],
+          "group": "Chat defaults"
+        },
+        {
+          "key": "safeAllowlist",
+          "type": "textarea",
+          "labelKey": "settings.user.safeAllowlist.label",
+          "descriptionKey": "settings.user.safeAllowlist.description",
+          "group": "Chat defaults",
+          "placeholderKey": "settings.user.safeAllowlist.placeholder"
         }
       ]
     }

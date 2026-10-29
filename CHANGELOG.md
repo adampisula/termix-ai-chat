@@ -4,6 +4,10 @@
 
 ### Added
 
-- A tab with notes
-- One admin setting
-- One table with migrations for SQLite, PostgreSQL and MySQL
+- AI Chat tab with per-user chat sessions and persisted history
+- `run_command` tool the agent uses to run shell commands on hosts you can connect to
+- Approval modes per chat: ask first, auto-run safe commands (prefix allowlist), auto-run all
+- OpenRouter, OpenAI and Anthropic providers with model and reasoning-effort pickers
+- Per-user encrypted API keys and optional base URL overrides
+- Admin limits for command timeout, output size and steps per message
+- Audit lines for every command execution

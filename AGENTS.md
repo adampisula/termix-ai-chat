@@ -57,7 +57,24 @@ file per theme scoped under `.<id>`). A theme only plugin has no `src/`: just `m
 
 ## About this plugin
 
-Keep this section current when the plugin changes: what it does, how it is put together, decisions that
-aren't obvious from the code, and anything that has bitten you before.
-
-- What it does: a template example that keeps short notes per user. Replace this.
+- What it does: an LLM chat whose agent can run shell commands on the user's SSH hosts. One tool,
+  `run_command`, via `ctx.ssh.exec`, with the acting user's connect access checked per call.
+- Layout: `src/backend/providers/` holds thin streaming adapters over `ctx.fetch` (no provider SDKs);
+  `src/backend/agent/` holds the run loop, the approval registry, the allowlist matcher and the
+  command executor; `src/backend/routes.ts` wires chats, runs, SSE streaming, approvals, models and hosts.
+- Decisions that are not obvious:
+  - Runs are driven from the backend and streamed over SSE (`GET /runs/:id/stream`). Approvals block the
+    loop on an in-memory promise the approvals route resolves, with a 15 minute timeout to a denial.
+  - One run per chat at a time (`chatBusy`), so message `seq` numbers never race.
+  - The `json()` parts column is plain text at the driver level: serialize with `JSON.stringify` and
+    parse on read. Do not pass objects to it.
+  - The model and reasoning effort for a run come from the POST body, falling back to the user's saved
+    settings; the chat row only stores the approval mode.
+  - The allowlist prefix match refuses any command containing `; & | < > \` $`, so a safe prefix cannot
+    smuggle a second command.
+- Things that have bitten: `better-sqlite3` needs prebuilt binaries (pinned 12.4.1 for Node 24 ABI;
+  13.x has none), `requires` in manifest settings only accepts boolean fields, and the manifest rejects
+  `$schema`.
+- Releases: pushing to main runs `release-on-push.yml`, which releases the manifest version unless its
+  tag exists. A push without a version bump does nothing; the shared `release.yml` (dev branches, beta,
+  overwrite) stays for the registry flow.

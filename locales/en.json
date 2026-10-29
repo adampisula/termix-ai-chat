@@ -1,26 +1,145 @@
 {
   "plugin": {
-    "name": "Hello World",
-    "description": "A minimal Termix plugin: one tab, one route, one setting and one table."
+    "name": "AI Chat",
+    "description": "An LLM chat that can run commands on your SSH hosts and read their output."
   },
   "tab": {
-    "title": "Hello World",
-    "empty": "No notes yet.",
-    "placeholder": "Write a note",
-    "add": "Add",
-    "error": "Could not load or save notes."
+    "title": "AI Chat",
+    "newChat": "New chat",
+    "empty": "Start a new chat and ask the agent to do something on one of your hosts.",
+    "noChats": "No chats yet.",
+    "placeholder": "Ask the agent to do something…",
+    "send": "Send",
+    "stop": "Stop",
+    "delete": "Delete chat",
+    "deleteConfirm": "Delete this chat and its history?",
+    "error": "Something went wrong. Check the provider settings and try again.",
+    "notConfigured": "Pick a provider and model in Settings, AI Chat, then come back.",
+    "noHosts": "You have no hosts you can connect to yet. Add one in the Hosts tab.",
+    "thinking": "Thinking…",
+    "waitingApproval": "Waiting for your approval…",
+    "tool": {
+      "title": "Command",
+      "host": "Host",
+      "exit": "Exit code",
+      "output": "Output",
+      "noOutput": "(no output)",
+      "denied": "You denied this command.",
+      "timedOut": "The command timed out.",
+      "truncated": "Output truncated.",
+      "running": "Running…"
+    },
+    "approval": {
+      "title": "The agent wants to run this command",
+      "run": "Run once",
+      "deny": "Deny",
+      "alwaysSafe": "Always allow commands like this"
+    },
+    "model": {
+      "label": "Model",
+      "effort": "Effort",
+      "loading": "Loading models…",
+      "none": "No models found",
+      "error": "Could not load models. Check your API key."
+    },
+    "effort": {
+      "none": "No reasoning",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "approvalMode": {
+      "label": "Commands",
+      "ask": "Ask first",
+      "autoSafe": "Auto-run safe",
+      "auto": "Auto-run all"
+    },
+    "chat": {
+      "untitled": "New chat"
+    }
   },
   "permissions": {
     "use": {
-      "title": "Use Hello World",
-      "description": "Open the Hello World tab and keep notes in it."
+      "title": "Use AI Chat",
+      "description": "Open the AI Chat tab and let an LLM run commands on hosts you can connect to."
     }
   },
   "settings": {
     "admin": {
-      "greeting": {
-        "label": "Greeting",
-        "description": "Shown at the top of the Hello World tab."
+      "limits": "Limits",
+      "commandTimeoutSec": {
+        "label": "Command timeout (seconds)",
+        "description": "How long a single command the agent runs may take."
+      },
+      "maxOutputChars": {
+        "label": "Max output per command (characters)",
+        "description": "Longer output is truncated before it reaches the model."
+      },
+      "maxTurnsPerRun": {
+        "label": "Max steps per message",
+        "description": "How many command-and-think steps the agent may take per message."
+      }
+    },
+    "user": {
+      "provider": {
+        "label": "Provider",
+        "description": "Which LLM provider to use. The matching API key below is required.",
+        "openrouter": "OpenRouter",
+        "openai": "OpenAI",
+        "anthropic": "Anthropic"
+      },
+      "providerGroup": "Provider",
+      "chatGroup": "Chat defaults",
+      "apiKeyOpenrouter": {
+        "label": "OpenRouter API key",
+        "description": "From openrouter.ai/keys. Stored encrypted, never sent to the browser."
+      },
+      "apiKeyOpenai": {
+        "label": "OpenAI API key",
+        "description": "From platform.openai.com. Stored encrypted, never sent to the browser."
+      },
+      "apiKeyAnthropic": {
+        "label": "Anthropic API key",
+        "description": "From console.anthropic.com. Stored encrypted, never sent to the browser."
+      },
+      "baseUrlOpenrouter": {
+        "label": "OpenRouter base URL",
+        "description": "Leave empty for the default.",
+        "placeholder": "https://openrouter.ai/api/v1"
+      },
+      "baseUrlOpenai": {
+        "label": "OpenAI base URL",
+        "description": "Leave empty for the default.",
+        "placeholder": "https://api.openai.com/v1"
+      },
+      "baseUrlAnthropic": {
+        "label": "Anthropic base URL",
+        "description": "Leave empty for the default.",
+        "placeholder": "https://api.anthropic.com/v1"
+      },
+      "model": {
+        "label": "Default model",
+        "description": "The model id new chats start with, like anthropic/claude-sonnet-4.5. You can change it per chat.",
+        "placeholder": "anthropic/claude-sonnet-4.5"
+      },
+      "reasoningEffort": {
+        "label": "Reasoning effort",
+        "description": "How much reasoning the model should do when it supports it.",
+        "none": "None (default)",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
+      },
+      "defaultApprovalMode": {
+        "label": "Default command approval",
+        "description": "How new chats gate commands. You can change it per chat.",
+        "ask": "Ask before every command",
+        "autoSafe": "Auto-run safe commands",
+        "auto": "Auto-run every command"
+      },
+      "safeAllowlist": {
+        "label": "Safe command prefixes",
+        "description": "One command per line, matched at the start of the command. Commands with pipes, ;, && or redirection are never auto-approved. Used in the auto-safe approval mode."
       }
     }
   }

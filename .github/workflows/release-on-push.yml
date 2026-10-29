@@ -1,0 +1,118 @@
+name: Release on main
+
+# On a push to main, builds and releases the version manifest.json declares.
+# A push without a version bump does nothing: the tag vX.Y.Z from the last
+# release marks the version as done. Bump the version in manifest.json,
+# package.json and CHANGELOG.md, then push (or merge) to release.
+#
+# This release is not signed; it gets GitHub build provenance instead, which
+# is what the community registry checks. The by-hand Release workflow
+# (release.yml) stays for dev branches, betas and overwrites.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  # Build provenance, so the community registry can check where the file
+  # was built.
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: release-main-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Resolve the version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p "require('./manifest.json').version")
+          tag="v$version"
+          if gh release view "$tag" > /dev/null 2>&1 || git ls-remote --tags origin "refs/tags/$tag" | grep -q "$tag"; then
+            echo "v$version is already released; nothing to do on this push."
+            echo "released=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Test
+        if: ${{ steps.version.outputs.released != 'true' }}
+        run: npx termix-plugin test
+
+      - name: Type-check
+        if: ${{ steps.version.outputs.released != 'true' }}
+        run: npm run typecheck --if-present
+
+      - name: Build
+        if: ${{ steps.version.outputs.released != 'true' }}
+        run: npm run build
+
+      - name: Validate
+        if: ${{ steps.version.outputs.released != 'true' }}
+        run: npx termix-plugin validate
+
+      - name: Pack
+        if: ${{ steps.version.outputs.released != 'true' }}
+        run: npx termix-plugin pack --out release
+
+      - name: Build provenance
+        if: ${{ steps.version.outputs.released != 'true' }}
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: release/*.tmxplug
+
+      - name: Release notes
+        if: ${{ steps.version.outputs.released != 'true' }}
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ -f CHANGELOG.md ]; then
+            npx termix-plugin changelog --version "$VERSION" > RELEASE_NOTES.md
+          else
+            echo "No CHANGELOG.md, so this release has no notes." > RELEASE_NOTES.md
+          fi
+          cat RELEASE_NOTES.md
+
+      - name: Tag and release
+        if: ${{ steps.version.outputs.released != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          hash=$(sha256sum release/*.tmxplug | cut -d' ' -f1)
+          {
+            cat RELEASE_NOTES.md
+            echo
+            echo "## Community registry"
+            echo
+            echo "To list this version, add it to the top of versions in community/plugins/$(node -p "require('./manifest.json').id").json in Termix-Registry and open a pull request."
+            echo
+            echo '```json'
+            echo "{ \"version\": \"$VERSION\", \"sha256\": \"$hash\" }"
+            echo '```'
+          } > RELEASE_NOTES.md
+          gh release create "$TAG" release/*.tmxplug \
+            --title "$TAG" --target "$GITHUB_SHA" --notes-file RELEASE_NOTES.md
+          echo "## Community registry submission" >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          echo "{ \"version\": \"$VERSION\", \"sha256\": \"$hash\" }" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

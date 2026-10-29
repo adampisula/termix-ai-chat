@@ -1,140 +1,47 @@
-<div align="center">
+# AI Chat
 
-<img src="https://termix.site/img/logo.svg" width="120" alt="Termix Logo" />
+An LLM chat for [Termix](https://termix.site) that can run commands on your SSH hosts and read their output — an opencode-style agent for your servers, built as a Termix plugin.
 
-<h1>Termix Plugin Template</h1>
-
-<p>A starter template for building your own Termix plugin</p>
-
-</div>
-
-<br />
-
-## Overview
-
-[Termix](https://github.com/Termix-SSH/Termix) is self-hosted, plugin-based server management, and every feature outside the core is a plugin. This template is a small Hello World plugin you can copy to start your own. It has one of each thing most plugins need, set up the same way as the official plugins.
-
-<br />
+You describe what you want; the agent proposes shell commands, runs them on the hosts you can connect to through Termix's own SSH pipeline, and iterates on the results until it can answer.
 
 ## Features
 
-- A tab opened from the sidebar
-- Two API routes behind a permission
-- An admin setting
-- A table with migrations for SQLite, PostgreSQL and MySQL
-- Backend and frontend tests
-- A release workflow that builds and publishes your plugin as a GitHub release, ready to submit to the [community registry](https://github.com/Termix-SSH/Termix-Registry)
+- Chat with an LLM that runs commands on your hosts via `ctx.ssh` (jump hosts, proxies, every auth type just work)
+- Three approval modes per chat: **ask first**, **auto-run safe** (prefix allowlist, shell metacharacters always refused) and **auto-run all**
+- Model and reasoning-effort picker per chat; OpenRouter, OpenAI and Anthropic adapters with optional base URL overrides
+- Chat history persisted per user on the server
+- Per-user, encrypted API keys; every executed command is audited
+- Admin limits: command timeout, output size per command, steps per message
 
-<br />
+## Requirements
 
-## Getting Started
+- A Termix server, 26.10 or newer, with this plugin installed
+- An API key for at least one provider (OpenRouter, OpenAI or Anthropic), set in Settings, AI Chat
 
-You need Node 24 and a Termix server you are an admin on. The full guide is at [docs.termix.site/develop](https://docs.termix.site/develop).
+## Development
 
-1. Click Use this template on GitHub to make your own repo, then clone it.
-2. In `manifest.json`, change `id`, `name`, `description`, `author`, `repository` and `docs`. The id is lowercase with dashes, like `my-plugin`. Then search the repo for `hello-world`, `hello_world` and `Hello World` and rename them to match: `package.json`, `locales/en.json`, the index name in `src/backend/tables.ts`, the API paths in `src/backend/routes.ts`, the tab id in `src/frontend/index.tsx` and the tests.
-3. Install the packages, then delete `migrations/` and write it again for your id:
+```bash
+npm install
+npm run migrations
+npm test            # vitest
+npm run typecheck
+npm run validate
+npm run build
+npx termix-plugin dev --server http://localhost:8080 --key tmx_...
+```
 
-   ```bash
-   npm install
-   npm run migrations
-   ```
+`npx termix-plugin dev` builds the plugin and installs it on a Termix server with plugin developer mode on, rebuilding on every save. See [docs/index.md](docs/index.md) for what the plugin does and [the Termix plugin docs](https://docs.termix.site/develop) for the SDK.
 
-4. In Termix, open Settings, then General, and turn on Plugin developer mode. Then make an API key under Settings, API keys.
-5. Build and install the plugin on your server. It rebuilds and reinstalls every time you save a file:
+## Releases
 
-   ```bash
-   npx termix-plugin dev --server http://localhost:30001 --key tmx_your_key
-   ```
+Pushing to `main` builds, tests and packs the version `manifest.json` declares and publishes it as a GitHub release with build provenance — but only when that version has no release yet. To release a new version, bump it in `manifest.json`, `package.json` and `CHANGELOG.md`, then push. The `.github/workflows/release.yml` workflow (run by hand from a `dev-X.Y.Z` branch) is still there for betas and overwrites.
 
-6. Run the tests and checks before you push:
+## Security notes
 
-   ```bash
-   npm test
-   npm run typecheck
-   npm run validate
-   npm run build
-   ```
-
-7. Using an AI coding tool? It reads `AGENTS.md` (or `CLAUDE.md`), which points it to the full plugin guide that ships with the SDK. Keep the About this plugin section in `AGENTS.md` up to date.
-
-8. Write your docs in `docs/`. `docs/index.md` is the page people see first. Settings, permissions, environment variables and the API reference are added for you from `manifest.json` and the `@openapi` comments on your routes.
-
-When you change a table in `src/backend/tables.ts`, run `npm run migrations` to write the SQLite, PostgreSQL and MySQL migrations. `npm run pack` writes `<id>-<version>.tmxplug` of the built plugin, which you can install from a file in the Plugins tab while developer mode is on.
-
-## Releasing
-
-Work happens on a `dev-X.Y.Z` branch made from `main`, named after the version it will ship as. `main` only changes when a release merges a dev branch into it.
-
-Run the Release workflow by hand from the dev branch:
-
-- beta publishes `X.Y.Z-beta.N` (N counts up on its own). Termix only offers it to people who turned on Beta versions for this plugin. Run it as often as you like.
-- stable releases `X.Y.Z`, merges the dev branch into `main`, deletes the dev branch and removes that version's beta releases. Add a `## X.Y.Z` section to `CHANGELOG.md` first, it becomes the release notes.
-- overwrite releases the manifest version again from the current commit, replacing its files.
-- dry-run builds and packs without publishing anything.
-
-No secrets are needed. The workflow records GitHub build provenance for the `.tmxplug` so the community registry can check where it was built. If a dev branch changes files in `.github/workflows`, add a `TERMIX_PAT` secret (a token with `repo` and `workflow` scopes) so the release can push it to `main`.
-
-## Submitting to the community registry
-
-Once a version is released, you can submit it to the [Termix community registry](https://github.com/Termix-SSH/Termix-Registry). The Release run's summary shows the `sha256` to put in your submission. Every version is reviewed by a person before it is listed. See the [guide](https://docs.termix.site/develop/community-registry).
-
-Once it is listed, admins who turn on the community registry in Plugins, Registries can install it from Browse.
-
-## Sponsors
-
-For a paid sponsor spot, email [mail@termix.site](mailto:mail@termix.site).
-
-<!-- SPONSORS:START -->
-
-<div align="center">
-
-<br />
-
-<a href="https://www.blacksmith.sh/">
-  <img src="https://termix.site/img/sponsors/blacksmith.svg" height="40" alt="Blacksmith" />
-</a>
-&nbsp;&nbsp;&nbsp;
-<a href="https://www.cloudflare.com/">
-  <img src="https://termix.site/img/sponsors/cloudflare.png" height="40" alt="Cloudflare" />
-</a>
-&nbsp;&nbsp;&nbsp;
-<a href="https://akamai.com/">
-  <img src="https://termix.site/img/sponsors/akamai.svg" height="40" alt="Akamai" />
-</a>
-&nbsp;&nbsp;&nbsp;
-<a href="https://aws.amazon.com/">
-  <img src="https://termix.site/img/sponsors/aws.png" height="40" alt="AWS" />
-</a>
-&nbsp;&nbsp;&nbsp;
-<a href="https://rackgenius.com/">
-  <img src="https://termix.site/img/sponsors/rackgenius.png" height="40" alt="Rack Genius" />
-</a>
-&nbsp;&nbsp;&nbsp;
-<a href="https://ginernet.com/">
-  <img src="https://termix.site/img/sponsors/ginernet.png" height="40" alt="Ginernet" />
-</a>
-&nbsp;&nbsp;&nbsp;
-<a href="https://www.hetzner.com/?mtm_campaign=termix&mtm_medium=referral&mtm_content=sponsoring_link">
-  <img src="https://termix.site/img/sponsors/hetzner.png" height="40" alt="Hetzner" />
-</a>
-
-</div>
-
-<!-- SPONSORS:END -->
-
-<br />
-
-## Support
-
-Bugs and ideas for the template go in this repo: [report a bug](https://github.com/Termix-SSH/Termix-Plugin-Template/issues/new?template=bug_report.yml) or [request a feature](https://github.com/Termix-SSH/Termix-Plugin-Template/issues/new?template=feature_request.yml).
-
-Problems with Termix itself (login, hosts, credentials, sharing, sync) go in the [Termix repo](https://github.com/Termix-SSH/Termix/issues/new/choose). Not sure where it goes? Open it there and it will be moved.
-
-Add as much detail as you can, in English if possible. For questions about building plugins, join the [Discord](https://discord.gg/jVQGdvHDrf) server.
-
-<br />
+- The safe-command allowlist is a UX convenience, not a security boundary. "Ask first" is the default approval mode.
+- Every command execution writes an audit line with the host and command.
+- API keys are stored encrypted by Termix and never sent to the browser.
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE).
+Apache-2.0
