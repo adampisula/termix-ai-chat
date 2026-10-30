@@ -461,6 +461,7 @@ export function registerRoutes(
       allowlist,
       approvalTimeoutMs: APPROVAL_TIMEOUT_MS,
       approvals,
+      prompts,
       makeSshExec: (emit) =>
         createSshExecFn(ctx, { userId: actor(), runId, prompts, emit }),
       store,
@@ -621,7 +622,7 @@ export function registerRoutes(
       const answer =
         typeof req.body?.answer === "string" ? req.body.answer : null;
       const promptId = String(req.params.promptId);
-      const ok = prompts.resolve(String(req.params.id), promptId, answer);
+      const ok = prompts.resolve(actor(), promptId, answer);
       if (!ok) return res.status(404).json({ error: "No such pending prompt" });
       // Every subscriber drops the question card now that it is answered.
       run.emit({ type: "ssh_prompt_resolved", promptId });

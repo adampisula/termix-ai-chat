@@ -8,6 +8,7 @@ import { buildSystemPrompt } from "./prompt.js";
 import type { ApprovalRegistry } from "./approvals.js";
 import type { CommandResult, ExecutorLimits, SshExecFn } from "./executor.js";
 import { executeCommand } from "./executor.js";
+import type { SshPromptRegistry } from "./ssh-prompts.js";
 import { isCommandSafe } from "./allowlist.js";
 
 export type RunStatus =
@@ -89,6 +90,7 @@ export interface RunDeps {
   allowlist: { prefixes: string[] };
   approvalTimeoutMs: number;
   approvals: ApprovalRegistry;
+  prompts: SshPromptRegistry;
   makeSshExec: (emit: (event: RunEvent) => void) => SshExecFn;
   store: MessageStore;
   isCancelled: () => boolean;
@@ -157,6 +159,11 @@ export async function runAgentTurn(
     subscribe(listener) {
       listeners.add(listener);
       listener({ type: "status", status });
+      // A subscriber that attaches late (reload, slow stream) still needs the
+      // question the host is currently waiting on.
+      for (const pending of deps.prompts.pendingFor(runId)) {
+        listener({ type: "ssh_prompt", ...pending });
+      }
       return () => listeners.delete(listener);
     },
     emit,

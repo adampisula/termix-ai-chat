@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.2
+
+### Fixed
+
+- The passphrase prompt card now actually submits: the answer route looked up the pending prompt by run id instead of user id, so Send, Skip and Enter all silently did nothing
+
 ## 1.2.1
 
 ### Fixed

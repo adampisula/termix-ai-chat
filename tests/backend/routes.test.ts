@@ -1,4 +1,5 @@
 import http from "node:http";
+import { EventEmitter } from "node:events";
 import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -23,6 +24,67 @@ let server: http.Server;
 let port: number;
 let requestActor = "user-1";
 const originalFetch = globalThis.fetch;
+
+interface FakeSshStream extends EventEmitter {
+  stderr: EventEmitter;
+  close: () => void;
+}
+
+function makeSshStream(): FakeSshStream {
+  const stream = new EventEmitter() as FakeSshStream;
+  stream.stderr = new EventEmitter();
+  stream.close = () => {};
+  return stream;
+}
+
+function providerResponse(kind: "tool" | "final"): Response {
+  const chunks =
+    kind === "tool"
+      ? [
+          '{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"t1","function":{"name":"run_command","arguments":"{\\"hostId\\":1,\\"command\\":\\"echo ok\\"}"}}]}}]}',
+          '{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}',
+        ]
+      : ['{"choices":[{"delta":{"content":"All done."}}]}'];
+  const body = chunks.map((line) => `data: ${line}\n\n`).join("");
+  return new Response(body, { status: 200 });
+}
+
+async function readSse(
+  response: Response,
+  stop: (event: Record<string, unknown>) => boolean,
+): Promise<Record<string, unknown>[]> {
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const events: Record<string, unknown>[] = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let index = buffer.indexOf("\n\n");
+    while (index !== -1) {
+      const block = buffer.slice(0, index);
+      buffer = buffer.slice(index + 2);
+      const dataLines = block
+        .split("\n")
+        .filter((line) => line.startsWith("data: "))
+        .map((line) => line.slice(6));
+      if (dataLines.length > 0) {
+        const event = JSON.parse(dataLines.join("\n")) as Record<
+          string,
+          unknown
+        >;
+        events.push(event);
+        if (stop(event)) {
+          void reader.cancel().catch(() => {});
+          return events;
+        }
+      }
+      index = buffer.indexOf("\n\n");
+    }
+  }
+  return events;
+}
 
 beforeEach(async () => {
   clearModelCache();
@@ -268,6 +330,105 @@ describe("chat routes", () => {
     expect(approve.status).toBe(404);
     requestActor = "user-1";
     provider.release();
+  });
+
+  it("answers an SSH passphrase prompt through the run", async () => {
+    const connectionOptions: Array<Record<string, unknown>> = [];
+    let failFirst = true;
+    (mock.ctx as { hosts: { checkAccess: unknown } }).hosts = {
+      ...(mock.ctx as { hosts: object }).hosts,
+      checkAccess: async () => ({
+        hasAccess: true,
+        isOwner: true,
+        isShared: false,
+      }),
+    };
+    (mock.ctx as { ssh: unknown }).ssh = {
+      withConnection: (
+        _host: number,
+        opts: Record<string, unknown>,
+        run: (client: unknown) => Promise<unknown>,
+      ) => {
+        connectionOptions.push(opts);
+        if (failFirst) {
+          return Promise.reject(
+            new Error(
+              "SSH key is encrypted. Please enter the passphrase to unlock it.",
+            ),
+          );
+        }
+        const stream = makeSshStream();
+        setTimeout(() => {
+          stream.emit("data", "ok");
+          stream.emit("exit", 0);
+          stream.emit("close");
+        }, 0);
+        return run({
+          exec: (
+            _command: string,
+            cb: (err: Error | undefined, opened?: FakeSshStream) => void,
+          ) => cb(undefined, stream),
+        });
+      },
+    };
+
+    // Provider: one turn asking for the command, then a final answer.
+    globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
+      if (String(input).startsWith("https://openrouter.ai/")) {
+        return providerResponse(providerCalls++ === 0 ? "tool" : "final");
+      }
+      return originalFetch(input as Parameters<typeof originalFetch>[0], init);
+    }) as typeof fetch;
+    let providerCalls = 0;
+
+    await configureProvider();
+    const created = await request("POST", "/chats", { approvalMode: "auto" });
+    const chatId = created.body.chat.id;
+    const sent = await request("POST", `/chats/${chatId}/messages`, {
+      text: "run echo on host 1",
+    });
+    const runId = sent.body.runId as string;
+
+    // Subscribe; the pending prompt is replayed to late subscribers.
+    const stream = await originalFetch(
+      `http://127.0.0.1:${port}/runs/${runId}/stream`,
+    );
+    const events = await readSse(
+      stream,
+      (event) => event.type === "ssh_prompt" || event.type === "done",
+    );
+    const promptEvent = events.find((e) => e.type === "ssh_prompt");
+    expect(promptEvent).toBeTruthy();
+    expect(promptEvent!.prompt).toContain("passphrase");
+
+    // Let the retry through before answering: resolving the prompt resumes
+    // the run in a microtask.
+    failFirst = false;
+    const answered = await request(
+      "POST",
+      `/runs/${runId}/prompts/${promptEvent!.promptId}`,
+      { answer: "pass123" },
+    );
+    expect(answered.status).toBe(200);
+
+    // The run finishes on its own; poll for the final message.
+    await vi.waitFor(async () => {
+      const listed = await request("GET", `/chats/${chatId}/messages`);
+      const last = listed.body.messages.at(-1);
+      expect(last.parts.text).toBe("All done.");
+    });
+
+    // The retry forced the passphrase in, and the command output landed.
+    expect(connectionOptions[1].overrides).toMatchObject({
+      keyPassword: "pass123",
+    });
+    const listed = await request("GET", `/chats/${chatId}/messages`);
+    const toolMessage = listed.body.messages.find(
+      (message: { role: string }) => message.role === "tool",
+    );
+    expect(toolMessage.parts.stdout).toBe("ok");
+    const finalMessage = listed.body.messages.at(-1);
+    expect(finalMessage.parts.text).toBe("All done.");
   });
 
   it("answers 404 for unknown pending approvals", async () => {

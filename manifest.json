@@ -1,7 +1,7 @@
 {
   "id": "agent-chat",
   "name": "AI Chat",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "An LLM chat that can run commands on your SSH hosts and read their output.",
   "author": {
     "name": "AI Chat contributors"

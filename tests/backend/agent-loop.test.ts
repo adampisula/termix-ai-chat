@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PluginContext } from "@termix-ssh/plugin-sdk/backend";
 import { ApprovalRegistry } from "../../src/backend/agent/approvals.js";
+import { SshPromptRegistry } from "../../src/backend/agent/ssh-prompts.js";
 import { executeCommand } from "../../src/backend/agent/executor.js";
 import {
   runAgentTurn,
@@ -123,6 +124,7 @@ describe("runAgentTurn", () => {
         allowlist: { prefixes: [] },
         approvalTimeoutMs: 1000,
         approvals,
+        prompts: new SshPromptRegistry(60000),
         makeSshExec: () => ssh.fn,
         store,
         isCancelled: () => false,
@@ -164,6 +166,7 @@ describe("runAgentTurn", () => {
         allowlist: { prefixes: [] },
         approvalTimeoutMs: 1000,
         approvals,
+        prompts: new SshPromptRegistry(60000),
         makeSshExec: () => ssh.fn,
         store,
         isCancelled: () => false,
@@ -228,6 +231,7 @@ describe("runAgentTurn", () => {
         allowlist: { prefixes: [] },
         approvalTimeoutMs: 1000,
         approvals,
+        prompts: new SshPromptRegistry(60000),
         makeSshExec: () => ssh.fn,
         store,
         isCancelled: () => false,
@@ -281,6 +285,7 @@ describe("runAgentTurn", () => {
         allowlist: { prefixes: ["ls"] },
         approvalTimeoutMs: 1000,
         approvals,
+        prompts: new SshPromptRegistry(60000),
         makeSshExec: () => ssh.fn,
         store,
         isCancelled: () => false,
@@ -324,6 +329,7 @@ describe("runAgentTurn", () => {
         allowlist: { prefixes: ["ls"] },
         approvalTimeoutMs: 1000,
         approvals,
+        prompts: new SshPromptRegistry(60000),
         makeSshExec: () => ssh.fn,
         store,
         isCancelled: () => false,
@@ -368,6 +374,7 @@ describe("runAgentTurn", () => {
         allowlist: { prefixes: [] },
         approvalTimeoutMs: 1000,
         approvals,
+        prompts: new SshPromptRegistry(60000),
         makeSshExec: () => ssh.fn,
         store,
         isCancelled: () => false,
@@ -404,6 +411,7 @@ describe("runAgentTurn", () => {
         allowlist: { prefixes: [] },
         approvalTimeoutMs: 1000,
         approvals,
+        prompts: new SshPromptRegistry(60000),
         makeSshExec: () => ssh.fn,
         store,
         isCancelled: () => false,
@@ -447,6 +455,7 @@ describe("runAgentTurn", () => {
         allowlist: { prefixes: [] },
         approvalTimeoutMs: 1000,
         approvals,
+        prompts: new SshPromptRegistry(60000),
         makeSshExec: () => ssh.fn,
         store,
         isCancelled: () => false,

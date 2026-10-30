@@ -23,8 +23,18 @@ export interface SshPromptAskArgs {
 
 export type SshPromptEmit = (event: Record<string, unknown>) => void;
 
+/** What a subscriber that attaches late needs to re-show the question. */
+export interface PendingSshPromptView {
+  promptId: string;
+  hostId: number;
+  kind: "totp" | "input" | "browser";
+  prompt: string;
+  echo: boolean;
+}
+
 interface PendingSshPrompt {
   runId: string;
+  payload: PendingSshPromptView;
   resolve: (answer: string | null) => void;
 }
 
@@ -58,14 +68,14 @@ export class SshPromptRegistry {
       if (cached !== undefined) return Promise.resolve(cached);
     }
     const promptId = randomUUID();
-    emit({
-      type: "ssh_prompt",
+    const payload: PendingSshPromptView = {
       promptId,
       hostId,
       kind: request.kind,
       prompt: request.prompt,
       echo: request.kind === "input" ? (request.echo ?? false) : false,
-    });
+    };
+    emit({ type: "ssh_prompt", ...payload });
     const key = this.pendingKey(userId, promptId);
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
@@ -75,6 +85,7 @@ export class SshPromptRegistry {
       }, this.timeoutMs);
       this.pending.set(key, {
         runId,
+        payload,
         resolve: (answer) => {
           clearTimeout(timer);
           if (cacheKey && answer !== null) {
@@ -99,6 +110,13 @@ export class SshPromptRegistry {
     this.pending.delete(key);
     entry.resolve(answer);
     return true;
+  }
+
+  /** Questions still waiting in a run, for subscribers that attach late. */
+  pendingFor(runId: string): PendingSshPromptView[] {
+    return [...this.pending.values()]
+      .filter((entry) => entry.runId === runId)
+      .map((entry) => entry.payload);
   }
 
   /** Cancels every prompt of a run: they give up, like an approval denial. */
